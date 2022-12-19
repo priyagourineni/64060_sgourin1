@@ -1,0 +1,261 @@
+---
+title: "pproject"
+author: "SaiPriya Gourineni"
+date: "2022-12-14"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data Collection
+
+```{r}
+data <- read.csv("C:/Users/Saipr/Downloads/diabetes.csv")
+head(data)
+```
+
+Data Summary
+
+```{r}
+summary(data)
+```
+
+A value of 0 in these columns indicates a missing value since it is illogical.
+
+The 0 value in the following columns or variables is invalid:Glucose,BloodPressure ,SkinThickness ,Insulin and BMI
+
+Since counting them thereafter would be simpler and zeros need to be replaced with appropriate values, it is preferable to replace zeros with nan.
+
+Replacing 0 with Nans
+
+```{r}
+data["BloodPressure"][data["BloodPressure"] == 0] <- NA
+data["Glucose"][data["Glucose"] == 0] <- NA
+data["SkinThickness"][data["SkinThickness"] == 0] <- NA
+data["Insulin"][data["Insulin"] == 0] <- NA
+data["BMI"][data["BMI"] == 0] <- NA
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+par(mfrow = c(3, 3))
+hist(data$BloodPressure)
+hist(data$Glucose)
+hist(data$SkinThickness)
+hist(data$Insulin)
+hist(data$BMI)
+```
+
+Replacing Nan values with the appropriate median/mean according to the data histogram
+
+```{r}
+data$BloodPressure[is.na(data$BloodPressure)] <- round(mean(data$BloodPressure, na.rm = TRUE))
+data$Glucose[is.na(data$Glucose)] <- round(mean(data$Glucose, na.rm = TRUE))
+data$SkinThickness[is.na(data$SkinThickness)] <- round(median(data$SkinThickness, na.rm = TRUE))
+data$Insulin[is.na(data$Insulin)] <- round(median(data$Insulin, na.rm = TRUE))
+data$BMI[is.na(data$BMI)] <- round(mean(data$BMI, na.rm = TRUE))
+```
+
+```{r}
+summary(data)
+```
+
+plotting the histograms after imputation:
+
+```{r}
+par(mfrow = c(3, 3))
+hist(data$BloodPressure)
+hist(data$Glucose)
+hist(data$SkinThickness)
+hist(data$Insulin)
+hist(data$BMI)
+```
+
+```{r}
+count_0 = 0
+for (i in data$Outcome) {
+  if (i == 0)
+    count_0 = count_0 +1
+}
+count_0
+count_1 = length(data$Outcome) - count_0
+count_1
+```
+
+```{r}
+A <- c(count_0, count_1)
+  
+# Plot the bar chart 
+barplot(A, xlab = "0 and 1 Count", ylab = "Count", main ="Outcome count")
+```
+
+```{r}
+length(data)
+length(data$Pregnancies)
+```
+
+Correlation Heatmap for cleaned data
+
+```{r}
+cormat <- round(cor(data),2)
+cormat
+```
+
+```{r}
+library(reshape2)
+ 
+
+ 
+melted_corr_mat <- melt(cormat)
+head(melted_corr_mat)
+ 
+# plotting the correlation heatmap
+library(ggplot2)
+ggplot(data = melted_corr_mat, aes(x=Var1, y=Var2,
+                                   fill=value)) +
+geom_tile() +
+ scale_x_discrete(guide = guide_axis(n.dodge=3))+ 
+geom_text(aes(Var2, Var1, label = value),
+          color = "black", size = 4)
+
+
+```
+
+Feature Scaling
+
+```{r}
+library(dplyr)
+library(caret)
+row_labels = data[,9]
+data[,1:8]<- as.data.frame(scale(data[,1:8]))
+row_labels
+```
+
+setting the seed so as to get the same result everytime and splitting the data into train and test
+
+```{r}
+
+set.seed(123)
+size <- floor(0.8 *  nrow(data))
+train_ind <- sample(seq_len(nrow(data)), size = size)
+
+data_train <- data[train_ind,1:8]
+data_test <- data[-train_ind,1:8]
+
+train_labels <- data[train_ind, 9]
+test_labels <- row_labels[-train_ind]
+length(data$Pregnancies)
+data_test
+```
+
+```{r}
+library(class)
+
+predictions <- knn(train = data_train,
+                   test = data_test,
+                   cl = train_labels,
+                   k= 9)
+length(predictions)
+
+```
+
+Confusion Matrix
+
+```{r}
+
+
+##create confusion matrix
+tab <- table( predictions, test_labels ) 
+tab
+```
+
+```{r}
+prediction <- factor(c(0, 0, 1, 1))
+test_label <- factor(c(0, 1, 0, 1))
+Y      <- c(11, 34, 91, 18)
+df <- data.frame(prediction, test_label, Y)
+```
+
+```{r}
+
+library(ggplot2)
+ggplot(data =  df, mapping = aes(x = test_label, y = prediction)) +
+  geom_tile(aes(fill = Y), colour = "white") +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_bw() + theme(legend.position = "none")
+```
+
+Accuracy
+
+```{r}
+
+##check the accuracy
+accuracy <-    function( matriz ){
+        sum( diag( x = matriz ) / sum( rowSums( x = matriz )) ) * 100.0
+}
+
+
+
+print( paste('accuracy ' , round( accuracy( tab ) , digits = 3 )  ) )
+```
+
+```{r}
+data_test
+```
+
+```{r}
+plot_predictions <- data.frame(
+  data_test$Pregnancies,
+  data_test$Glucose,
+  data_test$BloodPressure,
+  data_test$SkinThickness,
+  data_test$Insulin,
+  data_test$BMI,
+  data_test$DiabetesPedigreeFunction,
+  data_test$Age,
+  
+  predicted = predictions)
+
+colnames(plot_predictions) <- c("data_test$Pregnancies",
+                                "data_test$Glucose",
+                                "data_test$BloodPressure",
+                                "data_test$SkinThickness",
+                                "data_test$Insulin",
+                                "data_test$BMI",
+                                "data_test$DiabetesPedigreeFunction",
+                                "data_test$Age",
+                                "predicted")
+# Visualize the KNN algorithm results.
+library(ggplot2)
+library(plyr)
+require(gridExtra)
+
+
+
+p1 <- ggplot(plot_predictions, aes(data_test$Pregnancies,data_test$Glucose, color = predicted, fill = predicted)) + 
+  geom_point(size = 5) + 
+  geom_text(aes(label=test_labels),hjust=1, vjust=2) +
+  ggtitle("Predicted relationship between Pregnancies and Glucose Intake") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+
+p2 <- ggplot(plot_predictions, aes(data_test$BloodPressure, data_test$SkinThickness, color = predicted, fill = predicted)) + 
+  geom_point(size = 5) + 
+  geom_text(aes(label=test_labels),hjust=1, vjust=2) +
+  ggtitle("Predicted relationship between BloodPressure and Skinthickness") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+grid.arrange(p1, p2, ncol=1)
+```
